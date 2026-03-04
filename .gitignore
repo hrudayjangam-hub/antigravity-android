@@ -1,0 +1,31 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment
+.env
+
+# Build outputs
+dist/
+dist-*
+build/
+android/
+android-*
+*.zip
+*.ps1
+*.bat
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific
+app/
+EcoTracker.lnk
