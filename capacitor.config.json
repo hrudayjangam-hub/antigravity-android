@@ -1,0 +1,6 @@
+{
+    "appId": "com.ecotracker.app",
+    "appName": "EcoTracker",
+    "webDir": "public",
+    "bundledWebRuntime": false
+}
