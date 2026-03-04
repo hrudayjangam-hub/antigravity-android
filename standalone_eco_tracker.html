@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoTracker | Standalone Weather Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#10b981">
+    <link rel="apple-touch-icon" href="eco_tracker_icon.png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/@capacitor/core@latest/dist/capacitor.js"></script>
+    <style>
+        :root {
+            --primary: #10b981;
+            --primary-glow: rgba(16, 185, 129, 0.4);
+            --secondary: #3b82f6;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg-gradient: linear-gradient(135deg, #064e3b 0%, #0c4a6e 100%);
+            --card-bg: rgba(255, 255, 255, 0.08);
+            --card-border: rgba(255, 255, 255, 0.15);
+            --text-main: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.65);
+            --transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        [data-theme="light"] {
+            --bg-gradient: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+            --card-bg: rgba(255, 255, 255, 0.8);
+            --card-border: rgba(16, 185, 129, 0.15);
+            --text-main: #064e3b;
+            --text-dim: rgba(6, 78, 59, 0.65);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: var(--text-main);
+            overflow-x: hidden;
+            transition: var(--transition);
+            line-height: 1.6;
+        }
+
+        body.weather-rain {
+            --bg-gradient: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        }
+
+        body.weather-clear {
+            --bg-gradient: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%);
+        }
+
+        body.weather-clouds {
+            --bg-gradient: linear-gradient(135deg, #475569 0%, #64748b 100%);
+        }
+
+        .glass {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 28px;
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.15);
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 800;
+            font-size: 1.75rem;
+            cursor: pointer;
+        }
+
+        .logo span:last-child {
+            color: var(--primary);
+        }
+
+        .btn-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 1px solid var(--card-border);
+            background: var(--card-bg);
+            color: var(--text-main);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            transition: var(--transition);
+        }
+
+        .btn-circle:hover {
+            transform: scale(1.1);
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .search-row {
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1.25rem 1.5rem 1.25rem 3.5rem;
+            border-radius: 20px;
+            border: 1px solid var(--card-border);
+            background: var(--card-bg);
+            color: var(--text-main);
+            font-size: 1.1rem;
+            outline: none;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0.6;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .main-weather-card {
+            padding: 3rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .weather-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .city-name {
+            font-size: 3.5rem;
+            font-weight: 800;
+        }
+
+        .main-temp {
+            font-size: 6rem;
+            font-weight: 800;
+            line-height: 0.9;
+        }
+
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1.25rem;
+            border-radius: 20px;
+            text-align: center;
+        }
+
+        .aqi-card {
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .aqi-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-weight: 800;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .aqi-good {
+            background: #10b981;
+        }
+
+        .aqi-moderate {
+            background: #f59e0b;
+        }
+
+        .aqi-unhealthy {
+            background: #ef4444;
+        }
+
+        .meter-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 8px solid rgba(255, 255, 255, 0.1);
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 800;
+        }
+
+        .forecast-card {
+            grid-column: 1 / -1;
+            padding: 2rem;
+        }
+
+        .forecast-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .f-day {
+            text-align: center;
+            padding: 1.5rem;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-gradient);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-top: 5px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s infinite linear;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .history-chip {
+            background: var(--card-bg);
+            padding: 0.4rem 0.8rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border: 1px solid var(--card-border);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .history-chip:hover {
+            border-color: var(--primary);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .aqi-small-badge {
+            font-size: 0.65rem;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-weight: 800;
+        }
+
+        .aqi-good {
+            background: #10b981;
+        }
+
+        .aqi-moderate {
+            background: #f59e0b;
+        }
+
+        .aqi-unhealthy {
+            background: #ef4444;
+        }
+
+        .tracking-active {
+            animation: pulse 2s infinite;
+            color: var(--primary) !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .ai-badge {
+            background: linear-gradient(90deg, #8b5cf6, #3b82f6);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.6rem;
+            font-weight: 800;
+            margin-right: 8px;
+            text-transform: uppercase;
+        }
+
+        .eco-alert {
+            grid-column: 1 / -1;
+            padding: 1rem 2rem;
+            border-radius: 16px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-weight: 600;
+            display: none;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body data-theme="dark">
+    <div id="loader" class="loading-overlay">
+        <div class="spinner"></div>
+        <p style="margin-top: 1.5rem;">STANDALONE MODE ACTIVE</p>
+    </div>
+
+    <div class="container">
+        <header>
+            <div class="logo"><span>🌍</span><span>Eco<span>Tracker</span></span></div>
+            <div class="nav-actions">
+                <button class="btn-circle" id="install-btn" style="display: none;" title="Install App">📲</button>
+                <input type="text" id="username-input" class="search-input"
+                    style="padding: 0.5rem 1rem; width: 12rem; margin-right: 0.5rem;" placeholder="Your Name"
+                    value="Anonymous">
+                <button class="btn-circle" id="theme-toggle">🌗</button>
+                <button class="btn-circle" id="geo-btn">📍</button>
+                <button class="btn-circle" id="track-btn" title="Start Live Tracking">📡</button>
+            </div>
+        </header>
+
+        <div class="search-row">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="city-input" class="search-input" placeholder="Search city...">
+            <div id="history-list" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem;"></div>
+        </div>
+
+        <div id="alert-banner" class="eco-alert">
+            <span>⚠️</span>
+            <span id="alert-text">Analyzing environmental risks...</span>
+        </div>
+
+        <div class="dashboard-grid">
+            <section class="main-weather-card glass">
+                <div class="weather-info">
+                    <div>
+                        <h1 id="city-display" class="city-name">--</h1>
+                        <p id="condition-text" style="color: var(--text-dim);">Loading...</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="main-temp" id="temp-display">--°</div>
+                        <div style="color: var(--primary); cursor: pointer;" id="unit-toggle">°C | °F</div>
+                    </div>
+                </div>
+                <div class="quick-stats">
+                    <div class="stat-box"><span
+                            style="font-size: 0.8rem; color: var(--text-dim);">Humidity</span><br><strong
+                            id="humidity-val">--%</strong></div>
+                    <div class="stat-box"><span
+                            style="font-size: 0.8rem; color: var(--text-dim);">Wind</span><br><strong id="wind-val">--
+                            m/s</strong></div>
+                    <div class="stat-box"><span style="font-size: 0.8rem; color: var(--text-dim);">Feels
+                            Like</span><br><strong id="feels-val">--°</strong></div>
+                </div>
+            </section>
+
+            <section class="aqi-card glass">
+                <div style="display: flex; justify-content: space-between;">
+                    <h3>Eco Status</h3>
+                    <div id="aqi-badge" class="aqi-badge aqi-good">--</div>
+                </div>
+                <div style="text-align: center;">
+                    <div class="meter-circle" id="sustain-score">--</div>
+                    <p>Sustainability Index</p>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 15px;">
+                    <p id="eco-recommendation" style="font-size: 0.9rem; color: var(--text-dim);">Loading tips...</p>
+                    <div id="pollutant-breakdown"
+                        style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 1rem;">
+                        <!-- Pollutants -->
+                    </div>
+                </div>
+            </section>
+
+            <section class="forecast-card glass">
+                <h3>5-Day Forecast</h3>
+                <div class="forecast-grid" id="forecast-container"></div>
+                <div style="height: 200px; margin-top: 2rem;"><canvas id="precipChart"></canvas></div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(reg => console.log('SW Registered', reg))
+                    .catch(err => console.error('SW Registration Failed', err));
+            });
+        }
+
+        // Install Prompt Logic
+        let deferredPrompt;
+        const installBtn = document.getElementById('install-btn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'flex';
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    installBtn.style.display = 'none';
+                }
+                deferredPrompt = null;
+            }
+        });
+
+        const CLOUD_API_URL = 'https://your-eco-tracker.onrender.com'; // REPLACE THIS AFTER DEPLOYING
+        const BASE_API_URL = window.location.hostname === 'localhost' ? '/api' : `${CLOUD_API_URL}/api`;
+        let state = { units: 'metric', lat: null, lon: null, chart: null, isTracking: false, watchId: null, lastAQI: null, lastTemp: null };
+
+        const elements = {
+            alertBanner: document.getElementById('alert-banner'),
+            alertText: document.getElementById('alert-text'),
+            trackBtn: document.getElementById('track-btn')
+        };
+
+        async function init() {
+            // Load Preferences
+            try {
+                const prefs = await fetch(`${BASE_API_URL}/preferences`).then(r => r.json());
+                state.units = prefs.units || 'metric';
+                document.body.setAttribute('data-theme', prefs.theme || 'dark');
+            } catch (e) { console.error("Prefs Load Error", e); }
+
+            // Initial Location Detection
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    p => fetchWeather(p.coords.latitude, p.coords.longitude, 'search'),
+                    () => fetchByCity('London')
+                );
+            } else {
+                fetchByCity('London');
+            }
+
+            loadHistory();
+        }
+
+        async function loadHistory() {
+            try {
+                const history = await fetch(`${BASE_API_URL}/history`).then(r => r.json());
+                const historyList = document.getElementById('history-list');
+                if (historyList && history.length > 0) {
+                    const aqiClassMap = { 1: 'aqi-good', 2: 'aqi-good', 3: 'aqi-moderate', 4: 'aqi-unhealthy', 5: 'aqi-unhealthy' };
+                    historyList.innerHTML = history.map(item => `
+                        <div class="history-chip" onclick="fetchByCity('${item.city}')">
+                            ${item.city} 
+                            ${item.aqi ? `<span class="aqi-small-badge ${aqiClassMap[item.aqi] || ''}">${item.aqi}</span>` : ''}
+                        </div>
+                    `).join('');
+                }
+            } catch (e) { console.error("History Load Error", e); }
+        }
+
+        async function savePreferences() {
+            try {
+                await fetch(`${BASE_API_URL}/preferences`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        theme: document.body.getAttribute('data-theme'),
+                        units: state.units
+                    })
+                });
+            } catch (e) { console.error("Prefs Save Error", e); }
+        }
+
+        async function fetchWeather(lat, lon, source = 'search') {
+            document.getElementById('loader').classList.remove('hidden');
+            const username = document.getElementById('username-input').value || 'Anonymous';
+            try {
+                const [w, a, f] = await Promise.all([
+                    fetch(`${BASE_API_URL}/weather?lat=${lat}&lon=${lon}&units=${state.units}&username=${encodeURIComponent(username)}&source=${source}`).then(r => r.json()),
+                    fetch(`${BASE_API_URL}/aqi?lat=${lat}&lon=${lon}`).then(r => r.json()),
+                    fetch(`${BASE_API_URL}/forecast?lat=${lat}&lon=${lon}&units=${state.units}`).then(r => r.json())
+                ]);
+                updateUI(w, a, f);
+                state.lat = lat; state.lon = lon;
+                state.forecast = f.list; // Store forecast for AI
+                loadHistory(); // Refresh history
+            } catch (e) {
+                console.error("API Error Details:", e);
+                alert("EcoTracker Error: Ensure server is running.");
+            } finally {
+                document.getElementById('loader').classList.add('hidden');
+            }
+        }
+
+        async function fetchByCity(city) {
+            try {
+                const geo = await fetch(`${BASE_API_URL}/geo?q=${city}`).then(r => r.json());
+                if (geo.length) {
+                    fetchWeather(geo[0].lat, geo[0].lon);
+                } else {
+                    alert("Location not found.");
+                    document.getElementById('loader').classList.add('hidden');
+                }
+            } catch (e) {
+                console.error("Geocoding Error:", e);
+                document.getElementById('loader').classList.add('hidden');
+            }
+        }
+
+        function updateUI(weather, aqi, forecast) {
+            document.getElementById('city-display').innerText = weather.name;
+            document.getElementById('condition-text').innerText = weather.weather[0].description;
+            document.getElementById('temp-display').innerText = `${Math.round(weather.main.temp)}°`;
+            document.getElementById('humidity-val').innerText = `${weather.main.humidity}%`;
+            document.getElementById('wind-val').innerText = `${weather.wind.speed} m/s`;
+            document.getElementById('feels-val').innerText = `${Math.round(weather.main.feels_like)}°`;
+
+            const aqiVal = aqi.list[0].main.aqi;
+            const aqiMap = {
+                1: { text: "Excellent", class: "aqi-good", recommend: "Perfect for outdoor air." },
+                2: { text: "Fair", class: "aqi-good", recommend: "Good air quality." },
+                3: { text: "Moderate", class: "aqi-moderate", recommend: "Limit prolonged outdoor exertion." },
+                4: { text: "Poor", class: "aqi-unhealthy", recommend: "High pollution. Stay indoors." },
+                5: { text: "Hazardous", class: "aqi-unhealthy", recommend: "Serious health risk." }
+            };
+            const aqiData = aqiMap[aqiVal];
+            const badge = document.getElementById('aqi-badge');
+            badge.innerText = aqiData.text;
+            badge.className = `aqi-badge ${aqiData.class}`;
+            document.getElementById('eco-recommendation').innerText = aqiData.recommend;
+            document.getElementById('sustain-score').innerText = Math.max(0, 100 - (aqiVal * 15));
+
+            // GPS AI Engine Call
+            gpsAICore(weather, aqi);
+
+            // Pollutants
+            const comps = aqi.list[0].components;
+            const pLabels = { pm2_5: 'PM2.5', pm10: 'PM10', o3: 'O3', no2: 'NO2', so2: 'SO2', co: 'CO' };
+            document.getElementById('pollutant-breakdown').innerHTML = Object.entries(pLabels).map(([key, label]) => `
+                <div style="background: rgba(255,255,255,0.04); padding: 0.5rem; border-radius: 10px; text-align: center;">
+                    <span style="font-size: 0.6rem; color: var(--text-dim); display: block;">${label}</span>
+                    <span style="font-size: 0.8rem; font-weight: 700;">${comps[key].toFixed(1)}</span>
+                </div>
+            `).join('');
+
+            // Forecast
+            const daily = forecast.list.filter(f => f.dt_txt.includes("12:00:00")).slice(0, 5);
+            const container = document.getElementById('forecast-container');
+            container.innerHTML = '';
+            const chartLabels = [];
+            const rainData = [];
+
+            daily.forEach(day => {
+                const date = new Date(day.dt * 1000).toLocaleDateString('en-US', { weekday: 'short' });
+                const item = document.createElement('div');
+                item.className = 'f-day';
+                item.innerHTML = `<div>${date}</div><div style="font-size: 1.5rem; margin: 0.5rem 0;">🌤️</div><strong>${Math.round(day.main.temp_max)}°</strong>`;
+                container.appendChild(item);
+                chartLabels.push(date);
+                rainData.push(day.pop * 100);
+            });
+            updateChart(chartLabels, rainData);
+        }
+
+        // --- GPS AI & LIVE TRACKING ---
+
+        function toggleLiveTracking() {
+            if (state.isTracking) {
+                navigator.geolocation.clearWatch(state.watchId);
+                state.isTracking = false;
+                elements.trackBtn.classList.remove('tracking-active');
+                elements.trackBtn.title = "Start Live Tracking";
+            } else {
+                if (!navigator.geolocation) return alert("GPS not supported.");
+                state.isTracking = true;
+                elements.trackBtn.classList.add('tracking-active');
+                elements.trackBtn.title = "Live Tracking Active";
+                state.watchId = navigator.geolocation.watchPosition(
+                    pos => fetchWeather(pos.coords.latitude, pos.coords.longitude, 'gps'),
+                    err => { console.error(err); toggleLiveTracking(); },
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                );
+            }
+        }
+
+        function gpsAICore(weather, aqi) {
+            const currentAQI = aqi.list[0].main.aqi;
+            const currentTemp = weather.main.temp;
+            const rainProb = state.forecast ? state.forecast[0].pop : 0;
+
+            let aiAdvice = "";
+            let priority = false;
+
+            if (state.lastAQI !== null && currentAQI > state.lastAQI) {
+                aiAdvice = "Air Quality is degrading in your path. Indoor shelter advised.";
+                priority = true;
+            }
+            if (state.lastTemp !== null && Math.abs(currentTemp - state.lastTemp) > 3) {
+                aiAdvice = `Significant temp shift (${currentTemp > state.lastTemp ? 'Heat' : 'Cold'}). Adjust clothing.`;
+            }
+            if (rainProb > 0.5) {
+                aiAdvice = "High rain risk detected. Seek cover soon.";
+                priority = true;
+            }
+
+            if (aiAdvice) {
+                elements.alertBanner.style.display = 'flex';
+                elements.alertText.innerHTML = `<span class="ai-badge">GPS AI</span> ${aiAdvice}`;
+                elements.alertBanner.style.background = priority ?
+                    'linear-gradient(90deg, #ef4444, #8b5cf6)' :
+                    'linear-gradient(90deg, #8b5cf6, #3b82f6)';
+            }
+            state.lastAQI = currentAQI;
+            state.lastTemp = currentTemp;
+        }
+
+        function updateChart(labels, data) {
+            if (state.chart) state.chart.destroy();
+            state.chart = new Chart(document.getElementById('precipChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: 'Rain %', data: data, borderColor: '#10b981', fill: true, tension: 0.4 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+
+        document.getElementById('track-btn').addEventListener('click', toggleLiveTracking);
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            savePreferences();
+        });
+        document.getElementById('geo-btn').addEventListener('click', () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(p => fetchWeather(p.coords.latitude, p.coords.longitude));
+            }
+        });
+        document.getElementById('unit-toggle').addEventListener('click', () => {
+            state.units = state.units === 'metric' ? 'imperial' : 'metric';
+            document.getElementById('unit-toggle').innerText = state.units === 'metric' ? '°C | °F' : '°F | °C';
+            savePreferences();
+            if (state.lat) fetchWeather(state.lat, state.lon);
+        });
+
+        init();
+    </script>
+</body>
+
+</html>
