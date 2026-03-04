@@ -65,7 +65,8 @@ app.get('/api/history', async (req, res) => {
         const history = await Search.find().sort({ timestamp: -1 }).limit(10);
         res.json(history);
     } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch history' });
+        console.error('DB History Error:', err.message);
+        res.json([]); // Return empty array if DB fails so UI doesn't break
     }
 });
 
@@ -75,7 +76,8 @@ app.get('/api/preferences', async (req, res) => {
         if (!prefs) prefs = await Preference.create({ userId: 'default_user' });
         res.json(prefs);
     } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch preferences' });
+        console.error('DB Prefs Error:', err.message);
+        res.json({ theme: 'dark', units: 'metric' }); // Default fallback
     }
 });
 
@@ -95,18 +97,27 @@ app.post('/api/preferences', async (req, res) => {
 
 // Weather Proxy (with auto-logging)
 app.get('/api/weather', checkCache, async (req, res) => {
-    const { lat, lon, units = 'metric' } = req.query;
+    const { lat, lon, q, units = 'metric' } = req.query;
     try {
-        const response = await axios.get(`${BASE_URL}/weather`, {
-            params: { lat, lon, units, appid: API_KEY }
-        });
+        const params = { units, appid: API_KEY };
+        if (q) params.q = q;
+        else { params.lat = lat; params.lon = lon; }
+
+        const response = await axios.get(`${BASE_URL}/weather`, { params });
 
         // Fetch AQI for logging in history
         let aqiVal = null;
         try {
-            const aqiRes = await axios.get(`${BASE_URL}/air_pollution`, {
-                params: { lat, lon, appid: API_KEY }
-            });
+            const aqiParams = { appid: API_KEY };
+            if (q) {
+                // To get AQI by city name, we usually need its lat/lon, which we have in response.data.coord
+                aqiParams.lat = response.data.coord.lat;
+                aqiParams.lon = response.data.coord.lon;
+            } else {
+                aqiParams.lat = lat;
+                aqiParams.lon = lon;
+            }
+            const aqiRes = await axios.get(`${BASE_URL}/air_pollution`, { params: aqiParams });
             aqiRes.data.list?.[0]?.main?.aqi && (aqiVal = aqiRes.data.list[0].main.aqi);
         } catch (e) { console.error('AQI Log fetch error', e); }
 
@@ -136,10 +147,25 @@ app.get('/api/weather', checkCache, async (req, res) => {
 });
 
 app.get('/api/aqi', checkCache, async (req, res) => {
-    const { lat, lon } = req.query;
+    const { lat, lon, q } = req.query;
     try {
+        let targetLat = lat;
+        let targetLon = lon;
+
+        if (q) {
+            const geoRes = await axios.get(`http://api.openweathermap.org/geo/1.0/direct`, {
+                params: { q, limit: 1, appid: API_KEY }
+            });
+            if (geoRes.data.length > 0) {
+                targetLat = geoRes.data[0].lat;
+                targetLon = geoRes.data[0].lon;
+            } else {
+                return res.status(404).json({ error: 'City not found' });
+            }
+        }
+
         const response = await axios.get(`${BASE_URL}/air_pollution`, {
-            params: { lat, lon, appid: API_KEY }
+            params: { lat: targetLat, lon: targetLon, appid: API_KEY }
         });
         cache.set(req.originalUrl, response.data);
         res.json(response.data);
@@ -149,11 +175,13 @@ app.get('/api/aqi', checkCache, async (req, res) => {
 });
 
 app.get('/api/forecast', checkCache, async (req, res) => {
-    const { lat, lon, units = 'metric' } = req.query;
+    const { lat, lon, q, units = 'metric' } = req.query;
     try {
-        const response = await axios.get(`${BASE_URL}/forecast`, {
-            params: { lat, lon, units, appid: API_KEY }
-        });
+        const params = { units, appid: API_KEY };
+        if (q) params.q = q;
+        else { params.lat = lat; params.lon = lon; }
+
+        const response = await axios.get(`${BASE_URL}/forecast`, { params });
         cache.set(req.originalUrl, response.data);
         res.json(response.data);
     } catch (error) {
