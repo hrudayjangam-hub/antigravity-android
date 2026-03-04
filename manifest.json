@@ -1,0 +1,17 @@
+{
+    "name": "EcoTracker",
+    "short_name": "EcoTracker",
+    "description": "Premium Eco-Friendly Weather & AQI Tracker",
+    "start_url": "standalone_eco_tracker.html",
+    "display": "standalone",
+    "background_color": "#064e3b",
+    "theme_color": "#10b981",
+    "icons": [
+        {
+            "src": "eco_tracker_icon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
