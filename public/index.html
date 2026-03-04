@@ -697,7 +697,8 @@
 
         // --- CONFIG & STATE ---
         const CLOUD_API_URL = 'https://eco-tracker-p5jw.onrender.com'; // Live Render backend
-        const BASE_API_URL = window.location.hostname === 'localhost' ? '/api' : `${CLOUD_API_URL}/api`;
+        // Use relative /api when served from any web server; full URL only for mobile APK (file:// protocol)
+        const BASE_API_URL = window.location.protocol === 'file:' ? `${CLOUD_API_URL}/api` : '/api';
         let state = {
             units: 'metric', // metric or imperial
             lat: null,
